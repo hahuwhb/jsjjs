@@ -1,120 +1,98 @@
-const WebSocket = require('ws');
-const express = require('express');
-const cors = require('cors');
+import websocket
+import json
+import ssl
+import time
 
-const app = express();
-app.use(cors());
+# ==============================
+# Config
+# ==============================
+TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJnZW5kZXIiOjAsImNhblZpZXdTdGF0IjpmYWxzZSwiZGlzcGxheU5hbWUiOiJoZWxsb2tpZXRkZXB6YWkiLCJib3QiOjAsImlzTWVyY2hhbnQiOmZhbHNlLCJ2ZXJpZmllZEJhbmtBY2NvdW50Ijp0cnVlLCJwbGF5RXZlbnRMb2JieSI6ZmFsc2UsImN1c3RvbWVySWQiOjI2MzE1MDI1MiwiYWZmSWQiOiIwYjA4ZDA0YjI1YmNkMGFkNDQ4NGMwZjlkYmQ1NmM0ZSIsImJhbm5lZCI6ZmFsc2UsImJyYW5kIjoic3VuLndpbiIsInRpbWVzdGFtcCI6MTc1Nzc2NzEwNjI0NCwibG9ja0dhbWVzIjpbXSwiYW1vdW50IjowLCJsb2NrQ2hhdCI6ZmFsc2UsInBob25lVmVyaWZpZWQiOnRydWUsImlwQWRkcmVzcyI6IjI0MDI6ODAwOjYyY2Q6YjRkMTo4YzY0OmEzYzk6MTJiZjpjMTlhIiwibXV0ZSI6ZmFsc2UsImF2YXRhciI6Imh0dHBzOi8vaW1hZ2VzLnN3aW5zaG9wLm5ldC9pbWFnZXMvYXZhdGFyL2F2YXRhcl8wOS5wbmciLCJwbGF0Zm9ybUlkIjoxLCJ1c2VySWQiOiJjZGJhZjU5OC1lNGVmLTQ3ZjgtYjRhNi1hNDg4MTA5OGRiODYiLCJyZWdUaW1lIjoxNzQ5MTk0MTM2MTY1LCJwaG9uZSI6Ijg0MzY5ODIzODAwIiwiZGVwb3NpdCI6dHJ1ZSwidXNlcm5hbWUiOiJTQ19oZWxsb2tpZXRuZTIxMiJ9.ObqvJUUyS_yUN6VtK8-6NS5iV2cK5cGEMmrAFnzUOaI"  # <-- thay token thật của bạn
+# WebSocket URL có token
+WSS_URL = f"wss://websocket.azhkthg1.net/websocket?token={TOKEN}"
+HISTORY_FILE = "history.json"
 
-const PORT = process.env.PORT || 5000;
+# ==============================
+# Ghi lịch sử mỗi phiên vào file
+# ==============================
+def save_history(data):
+    try:
+        with open(HISTORY_FILE, "a", encoding="utf-8") as f:
+            f.write(json.dumps(data, ensure_ascii=False) + "\n")
+    except Exception as e:
+        print("⚠️ Lỗi lưu history:", e)
 
-// === URL WebSocket bạn đưa ===
-const WSS_URL = "wss://websocket.azhkthg1.net/websocket?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJnZW5kZXIiOjAsImNhblZpZXdTdGF0IjpmYWxzZSwiZGlzcGxheU5hbWUiOiJoZWxsb2tpZXRkZXB6YWkiLCJib3QiOjAsImlzTWVyY2hhbnQiOmZhbHNlLCJ2ZXJpZmllZEJhbmtBY2NvdW50Ijp0cnVlLCJwbGF5RXZlbnRMb2JieSI6ZmFsc2UsImN1c3RvbWVySWQiOjI2MzE1MDI1MiwiYWZmSWQiOiIwYjA4ZDA0YjI1YmNkMGFkNDQ4NGMwZjlkYmQ1NmM0ZSIsImJhbm5lZCI6ZmFsc2UsImJyYW5kIjoic3VuLndpbiIsInRpbWVzdGFtcCI6MTc1Nzc2NzEwNjI0NCwibG9ja0dhbWVzIjpbXSwiYW1vdW50IjowLCJsb2NrQ2hhdCI6ZmFsc2UsInBob25lVmVyaWZpZWQiOnRydWUsImlwQWRkcmVzcyI6IjI0MDI6ODAwOjYyY2Q6YjRkMTo4YzY0OmEzYzk6MTJiZjpjMTlhIiwibXV0ZSI6ZmFsc2UsImF2YXRhciI6Imh0dHBzOi8vaW1hZ2VzLnN3aW5zaG9wLm5ldC9pbWFnZXMvYXZhdGFyL2F2YXRhcl8wOS5wbmciLCJwbGF0Zm9ybUlkIjoxLCJ1c2VySWQiOiJjZGJhZjU5OC1lNGVmLTQ3ZjgtYjRhNi1hNDg4MTA5OGRiODYiLCJyZWdUaW1lIjoxNzQ5MTk0MTM2MTY1LCJwaG9uZSI6Ijg0MzY5ODIzODAwIiwiZGVwb3NpdCI6dHJ1ZSwidXNlcm5hbWUiOiJTQ19oZWxsb2tpZXRuZTIxMiJ9.ObqvJUUyS_yUN6VtK8-6NS5iV2cK5cGEMmrAFnzUOaI";
+# ==============================
+# Xử lý khi nhận message
+# ==============================
+def on_message(ws, message):
+    try:
+        # Tin Socket.io thường bắt đầu bằng "42" nếu event
+        if message.startswith("42"):
+            data = json.loads(message[2:])
+            event = data[0]
+            payload = data[1]
 
-// === Biến lưu lịch sử ===
-let historyData = []; // lưu nhiều phiên
-let ws = null;
-let pingInterval = null;
-let reconnectTimeout = null;
-let isManuallyClosed = false;
+            if event == "tx_result":  # event Tài Xỉu theo server
+                phien = payload.get("phien")
+                xx = payload.get("xx", [])
 
-// === Kết nối WebSocket ===
-function connectWebSocket() {
-  if (ws) {
-    isManuallyClosed = true;
-    ws.close();
-  }
-  isManuallyClosed = false;
+                if phien and len(xx) == 3:
+                    tong = sum(xx)
+                    ket_qua = "Tài" if tong >= 11 else "Xỉu"
 
-  ws = new WebSocket(WSS_URL, {
-    headers: {
-      "User-Agent": "Mozilla/5.0",
-      "Origin": "https://play.sun.win"
-    }
-  });
+                    ketqua = {
+                        "Phien": phien,
+                        "Xuc_xac_1": xx[0],
+                        "Xuc_xac_2": xx[1],
+                        "Xuc_xac_3": xx[2],
+                        "Tong": tong,
+                        "Ket_qua": ket_qua
+                    }
 
-  ws.on('open', () => {
-    console.log('[✅] WebSocket kết nối');
+                    # In ra JSON giống ảnh bạn muốn
+                    print(json.dumps(ketqua, ensure_ascii=False, indent=4))
+                    # Lưu vào file
+                    save_history(ketqua)
 
-    const messagesToSend = [
-      [1, "MiniGame", "SC_dsucac", "binhsex", {
-        "info": "{\"ipAddress\":\"\",\"userId\":\"\",\"username\":\"\",\"timestamp\":,\"refreshToken\":\"\"}",
-        "signature": ""
-      }],
-      [6, "MiniGame", "taixiuPlugin", { cmd: 1005 }],
-      [6, "MiniGame", "lobbyPlugin", { cmd: 10001 }]
-    ];
+    except Exception as e:
+        print("⚠️ Lỗi xử lý:", e)
 
-    messagesToSend.forEach((msg, i) => {
-      setTimeout(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify(msg));
-        }
-      }, i * 600);
-    });
+def on_error(ws, error):
+    print("❌ Lỗi WebSocket:", error)
 
-    pingInterval = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) ws.ping();
-    }, 15000);
-  });
+def on_close(ws, close_status_code, close_msg):
+    print("🔒 Đóng kết nối:", close_status_code, close_msg)
 
-  ws.on('pong', () => console.log('[📶] Ping OK'));
+def on_open(ws):
+    print("✅ Kết nối thành công tới Sunwin với origin web.sunwin.pro")
 
-  ws.on('message', (message) => {
-    try {
-      const data = JSON.parse(message);
-      if (Array.isArray(data) && typeof data[1] === 'object') {
-        const cmd = data[1].cmd;
+# ==============================
+# Chạy WebSocket có headers -> reconnect nếu cần
+# ==============================
+def run_ws():
+    # Header giống trình duyệt
+    headers = [
+        f"Origin: https://web.sunwin.pro",  
+        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
+        "Host: websocket.azhkthg1.net",
+        "Connection: Upgrade",
+        "Upgrade: websocket"
+    ]
 
-        if (cmd === 1003 && data[1].gBB) {
-          const { d1, d2, d3 } = data[1];
-          const total = d1 + d2 + d3;
-          const result = total > 10 ? "Tài" : "Xỉu";
+    while True:
+        try:
+            ws = websocket.WebSocketApp(
+                WSS_URL,
+                header=headers,
+                on_message=on_message,
+                on_error=on_error,
+                on_close=on_close
+            )
+            ws.on_open = on_open
+            ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
+        except Exception as e:
+            print("⚠️ Mất kết nối, sẽ thử lại sau 5s:", e)
+            time.sleep(5)
 
-          const record = {
-            Phien: data[1].sid,
-            Xuc_xac_1: d1,
-            Xuc_xac_2: d2,
-            Xuc_xac_3: d3,
-            Tong: total,
-            Ket_qua: result
-          };
-
-          historyData.unshift(record); // thêm vào đầu
-          if (historyData.length > 50) historyData.pop(); // chỉ giữ 50 phiên gần nhất
-
-          console.log("Phiên mới:", record);
-        }
-      }
-    } catch (e) {
-      console.error('[Lỗi]:', e.message);
-    }
-  });
-
-  ws.on('close', () => {
-    console.log('[🔌] WebSocket ngắt. Đang kết nối lại...');
-    clearInterval(pingInterval);
-    if (!isManuallyClosed) {
-      reconnectTimeout = setTimeout(connectWebSocket, 2500);
-    }
-  });
-
-  ws.on('error', (err) => console.error('[❌] WebSocket lỗi:', err.message));
-}
-
-// === API ===
-app.get('/taixiu', (req, res) => {
-  res.json(historyData);
-});
-
-app.get('/', (req, res) => {
-  res.send(`
-    <h2>🎯 API lịch sử Sunwin Tài Xỉu</h2>
-    <p><a href="/taixiu">Xem lịch sử JSON</a></p>
-  `);
-});
-
-// === Khởi động server ===
-app.listen(PORT, () => {
-  console.log(`[🌐] Server chạy tại http://localhost:${PORT}`);
-  connectWebSocket();
-});
+if __name__ == "__main__":
+    run_ws()
